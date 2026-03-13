@@ -1,28 +1,16 @@
-name: Python CI/CD on EC2
-
-on:
-  push:
-    branches: [ "main" ]
-
-jobs:
-  deploy:
-    runs-on: self-hosted  # <--- This targets your EC2
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Install Python Dependencies
+- name: Deploy Application
         run: |
-          sudo dnf install -y python3-pip
-          pip3 install --upgrade pip
-          # Only install if requirements.txt exists
-          if [ -f requirements.txt ]; then pip3 install -r requirements.txt; fi
-
-      - name: Deploy Application
-        run: |
-          echo "Starting deployment..."
-          # Example: Stop old version and start new one in background
-          pkill -f "python3 app.py" || true
+          # 1. Kill any old version running on 8080
+          sudo fuser -k 8080/tcp || true
+          
+          # 2. THE SECRET SAUCE: Tell GitHub NOT to kill this process
+          export RUNNER_TRACKING_ID=do_not_kill
+          
+          # 3. Start the app in the background
           nohup python3 app.py > app.log 2>&1 &
-          echo "Application launched successfully!"
+          
+          # 4. Wait a few seconds to make sure it doesn't crash immediately
+          sleep 5
+          
+          # 5. Verify it's still alive before finishing the job
+          netstat -tuln | grep 8080
